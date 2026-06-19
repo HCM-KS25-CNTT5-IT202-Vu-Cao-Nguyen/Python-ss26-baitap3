@@ -1,0 +1,94 @@
+
+1. SƠ ĐỒ CẤU TRÚC KẾ THỪA
+
+
+         ABC (Python built-in)
+          │
+          │ kế thừa
+          ▼
+       Champion  (Abstract Base Class)
+       - champion_id: str
+       - name: str
+       - base_hp: int
+       - base_atk: int
+       ─────────────────────────────
+       + calculate_skill_damage() [abstract]
+       + get_combat_power() -> float
+       + __add__(other)
+       + __radd__(other)
+       + __gt__(other) -> bool
+          │
+    ┌─────┴──────┐
+    │            │
+    ▼            ▼
+Warrior         Mage
+- shield_bonus  - ability_power
+────────────    ──────────────
++ calculate_    + calculate_
+  skill_damage()  skill_damage()
+
+Mối quan hệ:
+- Champion kế thừa ABC → trở thành Abstract Base Class, không thể
+  khởi tạo trực tiếp.
+- Warrior và Mage kế thừa Champion → bắt buộc phải implement
+  calculate_skill_damage(), dùng super().__init__() để tái sử dụng
+  phần khởi tạo thuộc tính chung.
+
+
+2. PHÂN TÍCH ĐA HÌNH (POLYMORPHISM)
+
+
+Hàm calculate_skill_damage() thể hiện Đa hình vì:
+
+- Cùng một tên hàm, nhưng mỗi lớp con định nghĩa lại theo đặc thù
+  riêng:
+    • Warrior: base_atk * 2 + shield_bonus (thiên về vật lý + giáp)
+    • Mage:    base_atk * ability_power   (thiên về phép thuật)
+
+- Khi hệ thống gọi champion.get_combat_power(), bên trong gọi
+  self.calculate_skill_damage() — Python tự động dispatch đến đúng
+  implementation của từng class tại runtime. Không cần if/else để
+  kiểm tra loại tướng.
+
+- Lợi ích khi mở rộng: Khi Studio muốn thêm hệ tướng mới như
+  Assassin hay Ranger, chỉ cần tạo lớp con mới và implement
+  calculate_skill_damage() theo công thức riêng. Không cần chỉnh sửa
+  bất kỳ dòng code nào ở Champion, Warrior hay Mage, cũng không cần
+  thêm if/else vào các hàm hiển thị/so sánh/tính tổng. Đây là nguyên
+  lý Open/Closed: mở để mở rộng, đóng để sửa đổi.
+
+
+3. PHÂN TÍCH NẠP CHỒNG TOÁN TỬ (OPERATOR OVERLOADING)
+
+
+__add__(self, other):
+  Xử lý 2 trường hợp:
+  (a) other là Champion:
+      → trả về self.get_combat_power() + other.get_combat_power()
+      → Dùng khi so sánh hoặc cộng 2 tướng trực tiếp.
+
+  (b) other là int hoặc float:
+      → trả về self.get_combat_power() + other
+      → Dùng khi cộng tướng với một số (ví dụ: champion + 0).
+
+__radd__(self, other):
+  Python gọi __radd__ khi toán hạng TRÁI không biết cách cộng với
+  Champion — cụ thể là khi dùng vòng lặp:
+
+    total = 0
+    total = total + champion  →  0 + champion → int không biết cộng
+                                 với Champion → Python thử champion.__radd__(0)
+
+  Hoặc khi dùng hàm sum([c1, c2, c3]) — sum() bắt đầu từ 0 và cộng
+  dần, nên __radd__ bắt buộc phải có để tránh TypeError.
+
+Ví dụ minh họa:
+    team = [WAR01, MAG01, WAR02]
+    total = 0
+    for c in team:
+        total = total + c
+    # Lần 1: 0 + WAR01 → WAR01.__radd__(0) → 0 + 2325 = 2325
+    # Lần 2: 2325 + MAG01 → int + Champion → MAG01.__radd__(2325)
+    #         → 2325 + 2675 = 5000
+    # Lần 3: 5000 + WAR02 → WAR02.__radd__(5000) → 5000 + 2550 = 7550
+    # Kết quả: 7550
